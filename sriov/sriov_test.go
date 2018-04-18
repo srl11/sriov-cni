@@ -14,7 +14,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-const MASTER_NAME = "eth1"
+const MASTER_NAME = "enp4s0f0"
 
 var _ = Describe("sriov Operations", func() {
 	var originalNS ns.NetNS
