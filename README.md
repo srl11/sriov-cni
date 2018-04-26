@@ -19,14 +19,12 @@ NIC with [SR-IOV](http://blog.scottlowe.org/2009/12/02/what-is-sr-iov/) capabili
 PF is used by host. Each VFs can be treated as a separate physical NIC and assigned to one container, and configured with separate MAC, VLAN and IP, etc.
 
 ## changes
-compare with Inter's sriov-cni, I made some changes.
+compare with Inter's sriov-cni, I made some changes.   
 1. saving conf-file before the dpdk enabled. So if dpdk failed, this conf-file won't be deleted.
-2. I'm assuming that the conf-file(containID-If0name), which it's created in the dpdk-mod process, is used to help user to find which  PCI-address is being used. I found that the containID is the k8s_POD's containID, not the container we acctually used. It's hard for the container to distinguish which conf-file belongs to it. Default, different pods get different networkNameSpaces. So I add a dir which is named after the container's networkNamespace. As all the container in the same pod share the same networkNameSpaces, they can eaily get their conf-file.
-Here is the changes. I have tested them on our lab, it works.
-1. create the conf-file after the dpdk-mode enabled successfuly;
-2. save the conf-file as "CNIDir/networkNameSpace/containerID-If0name" instand of "CNIDir/containerID-If0name"
-3. create the conf-file for all sriov-mod;
-2. add sriov-PF mode according to the VF code.
+2. I'm assuming that the conf-file(containID-If0name), which it's created in the dpdk-mod process, is used to help user to find which  PCI-address is being used. I found that the containID is the k8s_POD's containID, not the container we acctually used. It's hard for the container to distinguish which conf-file belongs to it. Default, different pods get different networkNameSpaces. So I add a dir which is named after the container's networkNamespace. As all the containers in the same pod share the same networkNameSpaces, they can eaily get their conf-file.    
+save the conf-file as "CNIDir/networkNameSpace/containerID-If0name" instand of "CNIDir/containerID-If0name"
+3. create the conf-file for all sriov-mode;  
+2. add sriov-PF mode according to the VF code.  
 
 
 ## Build
