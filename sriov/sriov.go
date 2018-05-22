@@ -12,6 +12,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+        "time"
 
 	"github.com/containernetworking/cni/pkg/ipam"
 	"github.com/containernetworking/cni/pkg/ns"
@@ -215,6 +216,7 @@ func enabledpdkmode(conf *dpdkConf, ifname string, dpdkmode bool) error {
 	cmd := exec.Command(conf.DPDKtool, "-b", driver, device)
 	cmd.Stdout = stdout
 	err := cmd.Run()
+        fmt.Println(time.Now().Format("2006-01-02 15:04:05"), "xftony: dpdkmode:",dpdkmode,"### driver:",driver,"### device",device)
 	if err != nil {
 		return fmt.Errorf("DPDK binding failed with err msg %q:", stdout.String(), driver, device)
 	}
@@ -241,6 +243,7 @@ func getpciaddress(ifName string, vf int) (string, error) {
 	}
 
 	pciaddr = pciinfo[len("../"):]
+	fmt.Println(time.Now().Format("2006-01-02 15:04:05"), "xftony: getVFPciAddress():device: virtfn",vf,"###pciaddr:", pciaddr,"###")
 	return pciaddr, nil
 }
 
@@ -262,6 +265,7 @@ func getPFPciAddress(ifName string) (string, error) {
 	}
 
 	pciaddr = pciinfo[len("../../../"):]
+	fmt.Println(time.Now().Format("2006-01-02 15:04:05"), "xftony: getPFPciAddress():","ifName:",ifName," ### pciaddr:", pciaddr,"###")
 	return pciaddr, nil
 }
 
@@ -361,6 +365,7 @@ func setupVF(conf *NetConf, ifName string, podifName string, cid string, netns n
 	var vfIdx int
 	var infos []os.FileInfo
 	var pciAddr string
+	fmt.Println(time.Now().Format("2006-01-02 15:04:05"), "xftony: start to setupVF")
 	m, err := netlink.LinkByName(ifName)
 	if err != nil {
 		return fmt.Errorf("failed to lookup master %q: %v", conf.IF0, err)
@@ -430,8 +435,10 @@ func setupVF(conf *NetConf, ifName string, podifName string, cid string, netns n
 		conf.DPDKConf.VFID = vfIdx
 
 		if err = enabledpdkmode(&conf.DPDKConf, infos[0].Name(), true); err != nil {
+			fmt.Println(time.Now().Format("2006-01-02 15:04:05"), "xftony, enable dpdk mode failed###.")
 			return err
 		}
+		fmt.Println(time.Now().Format("2006-01-02 15:04:05"), "xftony, enable dpdk mode finished###.")
 		return nil
 	}
 
@@ -540,6 +547,7 @@ func setupPF(conf *NetConf, ifName string, podifName string, cid string, netns n
 
 func releaseVF(conf *NetConf, podifName string, cid string, netns ns.NetNS, nsfd string) error {
 	// check for the DPDK mode and release the allocated DPDK resources
+	fmt.Println(time.Now().Format("2006-01-02 15:04:05"), "xftony:start to release VF")
 	if conf.DPDKMode != false {
 		df := &NetConf{}
 		// get the DPDK net conf in cniDir
@@ -647,6 +655,7 @@ func releaseVF(conf *NetConf, podifName string, cid string, netns ns.NetNS, nsfd
 
 func releasePF(conf *NetConf, podifName string, cid string, netns ns.NetNS, nsfd string) error {
 	// check for the DPDK mode and release the allocated DPDK resources
+	fmt.Println(time.Now().Format("2006-01-02 15:04:05"), "xftony:start to release PF")
 	if conf.DPDKMode != false {
 		df := &NetConf{}
 		// get the DPDK net conf in cniDir
@@ -714,6 +723,9 @@ func setupIF0(if0 string) error {
 	cmdStr := fmt.Sprintf("/sbin/ifconfig %s up", if0)
 	cmd := exec.Command("/bin/sh", "-c", cmdStr)
 	cmdErr := cmd.Run()
+	if cmdErr != nil {
+		fmt.Println(time.Now().Format("2006-01-02 15:04:05"), "xftony setupif0():cmdStr failed:", cmdStr, "###cmdErr:", cmdErr, "###")
+	}
 	return cmdErr
 }
 
@@ -765,6 +777,8 @@ func cmdAdd(args *skel.CmdArgs) error {
 	if err != nil {
 		return fmt.Errorf("failed to open netns %q: %v", netns, err)
 	}
+        fmt.Println(time.Now().Format("2006-01-02 15:04:05"), "xftony.cmdAdd(): containID:", args.ContainerID)
+	fmt.Println(time.Now().Format("2006-01-02 15:04:05"), "xftony.cmdAdd(): n:", n, "###args.Netns:", args.Netns, "###netns:", netns, "###")
 
 	defer netns.Close()
 
@@ -775,23 +789,40 @@ func cmdAdd(args *skel.CmdArgs) error {
         setupIF0(n.IF0) // setup IF0 no matter if up or down
 	if n.PFOnly != true {
 		if err = setupVF(n, n.IF0, args.IfName, args.ContainerID, netns, args.Netns); err != nil {
-			return fmt.Errorf("failed to set up pod VF interface %q from the device %q: %v", args.IfName, n.IF0, err)
-		}
+			fmt.Println(time.Now().Format("2006-01-02 15:04:05"), "failed to set up pod VF interface %q from the device %q: %v", args.IfName, n.IF0, err)
+                        if err1 := releaseVF(n, args.IfName, args.ContainerID, netns, args.Netns); err1 != nil {
+			  return err1
+		        } 
+		        fmt.Println(time.Now().Format("2006-01-02 15:04:05"), "xftony, sriov setupVF failed, releasedVF finished ###.")
+                        return  err
+                }
+		fmt.Println(time.Now().Format("2006-01-02 15:04:05"), "xftony, sriov setupVF finished###.")
 	} else {
+		fmt.Println(time.Now().Format("2006-01-02 15:04:05"), "xftony, sriov setupPF n.IF0:", n.IF0, "###args.IfName:", args.IfName, "###args.ContainerID:", args.ContainerID, "###netns:", netns, "###args.Netns:", args.Netns, "###")
 		if err = setupPF(n, n.IF0, args.IfName, args.ContainerID, netns, args.Netns); err != nil {
-			return fmt.Errorf("failed to set up pod PF interface %q from the device %q: %v", args.IfName, n.IF0, err)
-		}
+			fmt.Println(time.Now().Format("2006-01-02 15:04:05"),"failed to set up pod PF interface %q from the device %q: %v", args.IfName, n.IF0, err)
+		        if err1 := releasePF(n, args.IfName, args.ContainerID, netns, args.Netns); err1 != nil {
+                          return err1
+                        } 
+                        fmt.Println(time.Now().Format("2006-01-02 15:04:05"), "xftony, sriov setupPF failed, releasedPF finished ###.")
+                        return  err
+                }
+		fmt.Println(time.Now().Format("2006-01-02 15:04:05"), "xftony, sriov setupPF finished###.")
 	}
 
 	// skip the IPAM allocation for the DPDK and L2 mode
 	var result *types.Result
 	if n.DPDKMode != false || n.L2Mode != false {
 		if err = saveConf(args.ContainerID, n.CNIDir, n, args.Netns); err != nil {
+			fmt.Println(time.Now().Format("2006-01-02 15:04:05"), "xftony, sriov saveConf failed###.")
 			return err
 		}
+		fmt.Println(time.Now().Format("2006-01-02 15:04:05"), "xftony, sriov saveConf finished, path:",n.CNIDir)
+		fmt.Println(time.Now().Format("2006-01-02 15:04:05"), "xftony. cmdAdd finished, result.Print():", result.Print(), "#####")
 		os.Stdout = stdoutOld
 		return result.Print()
 	}
+	// fmt.Println("xftony. IPAM start, n.IPAM.Type:", n.IPAM.Type,"###args.StdinData",args.StdinData, "#####")
 
 	// run the IPAM plugin and get back the config to apply
 	result, err = ipam.ExecAdd(n.IPAM.Type, args.StdinData)
@@ -801,9 +832,10 @@ func cmdAdd(args *skel.CmdArgs) error {
 	if result.IP4 == nil {
 		return errors.New("IPAM plugin returned missing IPv4 config")
 	}
+	fmt.Println(time.Now().Format("2006-01-02 15:04:05"), "xftony ipam.ExecAdd() finished###")
 	err = netns.Do(func(_ ns.NetNS) error {
 		if err = saveConf(args.ContainerID, n.CNIDir, n, args.Netns); err != nil {
-			return err
+			fmt.Println(time.Now().Format("2006-01-02 15:04:05"), "xftony, sriov saveConf failed###.")
 		}
 		return ipam.ConfigureIface(args.IfName, result)
 	})
@@ -813,8 +845,9 @@ func cmdAdd(args *skel.CmdArgs) error {
 
 	result.DNS = n.DNS
 	if err = saveConf(args.ContainerID, n.CNIDir, n, args.Netns); err != nil {
-	      return err
-        }
+		fmt.Println(time.Now().Format("2006-01-02 15:04:05"), "xftony, sriov saveConf failed###.")
+	}
+	fmt.Println(time.Now().Format("2006-01-02 15:04:05"), "xftony. cmdAdd finished, result.Print():", result.Print(), "#####")
 	os.Stdout = stdoutOld
 	return result.Print()
 }
@@ -846,14 +879,19 @@ func cmdDel(args *skel.CmdArgs) error {
 	if n.IF0NAME != "" {
 		args.IfName = n.IF0NAME
 	}
+	fmt.Println(time.Now().Format("2006-01-02 15:04:05"), "xftony.cmdDel(): n:", n, "###args.Netns:", args.Netns, "###netns:", netns, "###")
 	if n.PFOnly != true {
 		if err = releaseVF(n, args.IfName, args.ContainerID, netns, args.Netns); err != nil {
+			fmt.Println(time.Now().Format("2006-01-02 15:04:05"), "xftony:failed to release VF")
 			return err
 		}
+		fmt.Println(time.Now().Format("2006-01-02 15:04:05"), "xftony:finish to release VF")
 	} else {
 		if err = releasePF(n, args.IfName, args.ContainerID, netns, args.Netns); err != nil {
+			fmt.Println(time.Now().Format("2006-01-02 15:04:05"), "xftony:failed to release PF")
 			return err
 		}
+		fmt.Println(time.Now().Format("2006-01-02 15:04:05"), "xftony:finish to release PF")
 	}
 
 	s := []string{args.ContainerID, n.IF0NAME}
@@ -891,6 +929,8 @@ func main() {
 	}
 	f, _ := os.OpenFile("/root/xftony/log/sriov.log", os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0755)
 	os.Stdout = f
+	fmt.Println("###################################################")
+	fmt.Println(time.Now().Format("2006-01-02 15:04:05"),"sriov start")
 	skel.PluginMain(cmdAdd, cmdDel)
 }
 
