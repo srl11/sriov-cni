@@ -134,7 +134,7 @@ func saveScratchNetConf(containerID, dataDir string, netconf []byte, nsfd string
 		return fmt.Errorf("failed to create the sriov data directory(%q): %v", dataDir, err)
 	}
 
-	path := filepath.Join(newDataDir, containerID)
+	path := filepath.Join(newDataDir, containerID+".json")
 	err = ioutil.WriteFile(path, netconf, 0600)
 	if err != nil {
 		return fmt.Errorf("failed to write container data in the path(%q): %v", path, err)
