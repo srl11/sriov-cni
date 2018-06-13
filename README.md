@@ -22,19 +22,22 @@ PF is used by host. Each VFs can be treated as a separate physical NIC and assig
 compare with Intel's sriov-cni, I made some changes.   
 1. saving conf-file before the dpdk enabled. So if dpdk failed, this conf-file won't be deleted.
 2. I'm assuming that the conf-file(containID-If0name), which it's created in the dpdk-mod process, is used to help user to find which  PCI-address is being used. I found that the containID is the k8s_POD's containID, not the container we acctually used. It's hard for the container to distinguish which conf-file belongs to it. Default, different pods get different networkNameSpaces. So I add a dir which is named after the container's networkNamespace. As all the containers in the same pod share the same networkNameSpaces, they can eaily get their conf-file.    
-save the conf-file as "CNIDir/networkNameSpace/containerID-If0name" instand of "CNIDir/containerID-If0name"
-3. create the conf-file for all sriov-mode;  
-2. add sriov-PF mode according to the VF code.  
+save the conf-file as "CNIDir/networkNameSpace/containerID-If0name.json" instand of "CNIDir/containerID-If0name";
+3. create the conf-file for all sriov-mode;    
+4. add sriov-PF mode according to the VF code;  
+5. rollback if failed.   
 
 
 ## Build
 
 This plugin requires Go 1.5+ to build.
 
-Go 1.5 users will need to set `GO15VENDOREXPERIMENT=1` to get vendored dependencies. This flag is set by default in 1.6.
+Go 1.5 users will need to set `GO15VENDOREXPERIMENT=1` to get vendored dependencies. This flag is set by default in 1.6.   
+[golang installation](https://xftony.github.io/软件安装/2018/04/26/golang安装.html)
 
 ```
-#./build
+# cd sriov-cni
+# ./build
 ```
 
 Upon successful build the plugin binary will be available in `bin/sriov`. 
@@ -45,6 +48,11 @@ Given Intel ixgbe NIC on CentOS, Fedora or RHEL:
 
 	# vi /etc/modprobe.conf
 	options ixgbe max_vfs=8,8
+    # reboot
+or 
+
+    # cd /sys/class/net/enp129s0f0/device  
+    # echo 8 > sriov_numvfs  
 
 
 ## Configuration reference
@@ -134,4 +142,4 @@ If given, The DPDK configuration expected to have the following parameters
 [More info](https://github.com/containernetworking/cni/pull/259).
 
 ## Contacts
-For any questions about my sriov-cni version, please reach out on github issue or feel free to contact me @xftony by [e-mail](srl11@foxmail.com)
+For any questions about my sriov-cni version, please reach out on github issue or feel free to contact me @xftony by e-mail: <srl11@foxmail.com>
